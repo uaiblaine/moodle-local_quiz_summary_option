@@ -19,9 +19,10 @@ A simple local plugin that enables the option to hide summary of attempt page on
 
 ## Branches
 
-| Moodle version        |       Branch     |  PHP  |
-|-----------------------|------------------|-------|
-| Moodle 3.9+           | MOODLE_39_STABLE | 7.2   |
+| Moodle version | Branch              | PHP |
+|----------------|---------------------|-----|
+| Moodle 3.9+    | MOODLE_39_STABLE    | 7.2 |
+| Moodle 4.5+    | MOODLE_405_STABLE   | 8.1 |
 
 ## Installation
 **Installing via Git**
