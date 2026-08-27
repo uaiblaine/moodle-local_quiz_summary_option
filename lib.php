@@ -15,110 +15,113 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Lib functions.
+ * Callbacks core looks for in a plugin's lib.php.
  *
- * @package   local_quiz_summary_option
- * @author    Christina Roperto (christinatheeroperto@catalyst-au.net)
- * @copyright Catalyst IT
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * The two course-module form callbacks have no Hooks API replacement on any
+ * supported branch — course/moodleform_mod.php and course/modlib.php still
+ * dispatch them through get_plugins_with_function() without the
+ * migrated-to-hook flag — so lib.php remains their correct home.
+ *
+ * @package    local_quiz_summary_option
+ * @copyright  2021 Catalyst IT
+ * @copyright  2026 Anderson Blaine
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+
+use local_quiz_summary_option\local\option;
 
 /**
- * Implements callbacks coursemodule_standard_elements to add an option to show/hide quiz summary page.
+ * Adds the summary page option to the quiz settings form.
  *
- * @param \moodleform_mod $formwrapper An instance of moodleform_mod class.
- * @param \MoodleQuickForm $mform Course module form instance.
+ * @param moodleform_mod $formwrapper The course module form being built.
+ * @param MoodleQuickForm $mform The form to add elements to.
+ * @return void
  */
-define('SUMMARY_OPTION_SHOW', 'SHOW');
-define('SUMMARY_OPTION_HIDE', 'HIDE');
-
-function local_quiz_summary_option_coursemodule_standard_elements(\moodleform_mod $formwrapper, \MoodleQuickForm $mform) {
-    global $DB;
-
-    $modulename = $formwrapper->get_current()->modulename;
-    if ($modulename != 'quiz') {
+function local_quiz_summary_option_coursemodule_standard_elements(moodleform_mod $formwrapper, MoodleQuickForm $mform) {
+    $current = $formwrapper->get_current();
+    if (empty($current->modulename) || $current->modulename !== 'quiz') {
         return;
     }
 
-    $cmid = $formwrapper->get_current()->coursemodule;
-    $row = $DB->get_record('local_quiz_summary_option', ['cmid' => $cmid], 'show_summary');
-    $show = true;
-    if ($row) {
-        $show = $row->show_summary;
-    }
-    $default = $show ? SUMMARY_OPTION_SHOW : SUMMARY_OPTION_HIDE;
+    /* On the add path core sets coursemodule to the EMPTY STRING
+       (prepare_new_moduleinfo_data()), not to null or zero. Passing that straight
+       into a bigint comparison makes PostgreSQL reject the query and the settings
+       page dies, while MySQL silently coerces it to 0 — so the cast is what keeps
+       "Add an activity -> Quiz" working, and it fails on only half the CI matrix
+       if it is removed. */
+    $cmid = (int) ($current->coursemodule ?? 0);
 
-    $mform->addElement('header', 'summaryoptionhdr', get_string('summarypageoption', 'local_quiz_summary_option'));
+    $mform->addElement(
+        'header',
+        'local_quiz_summary_optionhdr',
+        get_string('summarypageoption', 'local_quiz_summary_option')
+    );
     $mform->addElement(
         'select',
-        'summaryoption',
+        'local_quiz_summary_option',
         get_string('summaryoption', 'local_quiz_summary_option'),
         [
-            SUMMARY_OPTION_SHOW => get_string('summaryoption_show', 'local_quiz_summary_option'),
-            SUMMARY_OPTION_HIDE => get_string('summaryoption_hide', 'local_quiz_summary_option'),
+            option::SHOW => get_string('summaryoption_show', 'local_quiz_summary_option'),
+            option::HIDE => get_string('summaryoption_hide', 'local_quiz_summary_option'),
         ]
     );
-    $mform->setDefault('summaryoption', $default);
-    $mform->addHelpButton('summaryoption', 'summaryoption', 'local_quiz_summary_option');
+    $mform->setDefault('local_quiz_summary_option', option::is_shown($cmid) ? option::SHOW : option::HIDE);
+    $mform->addHelpButton('local_quiz_summary_option', 'summaryoption', 'local_quiz_summary_option');
 }
 
 /**
- * Implements hook coursemodule_edit_post_actions and adding a show flag.
+ * Stores the submitted summary page option after a quiz is created or updated.
  *
- * @param stdClass $moduleinfo Course module object.
- * @param int $course Course ID.
+ * @param stdClass $moduleinfo The module data just saved by core.
+ * @param stdClass $course The course the module belongs to.
+ * @return stdClass The unmodified module data, as core expects it back.
  */
 function local_quiz_summary_option_coursemodule_edit_post_actions($moduleinfo, $course) {
-    if ($moduleinfo->modulename != 'quiz') {
+    if (empty($moduleinfo->modulename) || $moduleinfo->modulename !== 'quiz') {
         return $moduleinfo;
     }
-    $show = 1;
-    $cmid = $moduleinfo->coursemodule;
-    if (isset($moduleinfo->summaryoption) && $moduleinfo->summaryoption == SUMMARY_OPTION_HIDE) {
-        $show = 0;
-    }
-    global $DB;
-    $row = $DB->get_record('local_quiz_summary_option', ['cmid' => $cmid], 'id');
 
-    // Check if record exists, if yes then update otherwise insert the record.
-    if ($row) {
-        $DB->update_record('local_quiz_summary_option', ['id' => $row->id, 'show_summary' => $show]);
-    } else {
-        $DB->insert_record('local_quiz_summary_option', ['cmid' => $cmid, 'show_summary' => $show], false);
+    /* An absent property means "not submitted through the settings form", not "show".
+       Core's own update_module() API builds a moduleinfo carrying only modulename,
+       scale and type, so treating absence as the default would silently reset a
+       teacher's Hide back to Show every time an unrelated tool updated the quiz.
+       The element name is frankenstyle-prefixed because it is added into mod_quiz's
+       own form namespace, where apply_admin_defaults() binds any quiz admin setting
+       whose name matches an element. */
+    if (!property_exists($moduleinfo, 'local_quiz_summary_option')) {
+        return $moduleinfo;
     }
+
+    option::set(
+        (int) $moduleinfo->coursemodule,
+        $moduleinfo->local_quiz_summary_option !== option::HIDE
+    );
+
     return $moduleinfo;
 }
+
 /**
- * Checks if show summary is disabled (hidden) then skips summary page.
+ * Skips the summary of attempt page when the option is set to hide it.
+ *
+ * @return void
  */
 function local_quiz_summary_option_after_config() {
-    global $DB, $SCRIPT;
+    global $SCRIPT;
 
-    if ($SCRIPT != '/mod/quiz/processattempt.php') {
+    if (!isset($SCRIPT) || $SCRIPT !== '/mod/quiz/processattempt.php') {
         return;
     }
 
-    $nextpage = optional_param('nextpage', 0, PARAM_INT);
-    if ($nextpage != -1) {
+    if (optional_param('nextpage', 0, PARAM_INT) !== -1) {
         return;
     }
 
-    // The $_POST['next'] =  Finish attempt... is only set when you click the button.
-    // Setting the default to none to ensure that it's the only button to finish attempt.
-    $thispage = optional_param('thispage', 0, PARAM_INT);
     $next = optional_param('next', null, PARAM_TEXT);
-    if (is_null($next) && ($thispage != -1)) {
+    if ($next === null && optional_param('thispage', 0, PARAM_INT) !== -1) {
         return;
     }
 
-    $cmid = optional_param('cmid', null, PARAM_INT);
-    $row = $DB->get_record('local_quiz_summary_option', ['cmid' => $cmid], 'show_summary');
-    if (!$row) {
-        return;
-    }
-
-    $show = $row->show_summary;
-    if ($show) {
+    if (option::is_shown(optional_param('cmid', 0, PARAM_INT))) {
         return;
     }
 

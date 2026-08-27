@@ -14,26 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+namespace local_quiz_summary_option\privacy;
+
 /**
  * Privacy Subsystem implementation.
  *
- * @package local_quiz_summary_option
- * @copyright  Catalyst IT
+ * The plugin stores one row per quiz course module holding a single display flag.
+ * No column identifies a user, and nothing is written on a student's behalf.
+ *
+ * @package    local_quiz_summary_option
+ * @copyright  2021 Catalyst IT
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
-namespace local_quiz_summary_option\privacy;
-
-defined('MOODLE_INTERNAL') || die();
-
 class provider implements \core_privacy\local\metadata\null_provider {
     /**
-     * Get the language string identifier with the component's language
-     * file to explain why this plugin stores no data.
+     * Language string identifier explaining why this plugin stores no personal data.
      *
-     * @return  string
+     * @return string
      */
-    public static function get_reason() : string {
+    public static function get_reason(): string {
         return 'privacy:metadata';
     }
 }

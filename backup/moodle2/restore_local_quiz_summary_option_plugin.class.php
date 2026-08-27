@@ -14,31 +14,49 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+use local_quiz_summary_option\local\option;
+
 /**
- * Lib functions.
+ * Restore steps for the quiz summary page option.
  *
- * @package   local_quiz_summary_option
- * @author    Christina Roperto (christinatheeroperto@catalyst-au.net)
- * @copyright Catalyst IT
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package    local_quiz_summary_option
+ * @category   backup
+ * @copyright  2021 Catalyst IT
+ * @copyright  2026 Anderson Blaine
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 /**
- * Define all the restore steps that will be used by the backup_local_quiz_summary_option_plugin
+ * Restores the stored summary page option onto the newly created quiz.
  */
 class restore_local_quiz_summary_option_plugin extends restore_local_plugin {
+    /**
+     * Declare the element this plugin restores from a module backup.
+     *
+     * The element name comes from get_namefor() so it matches the processing method
+     * core derives from it ('process_' . name) and cannot collide with another
+     * plugin's element at the same connection point.
+     *
+     * @return array The restore path elements to register.
+     */
     protected function define_module_plugin_structure() {
-        $paths = [];
-
-        // This will call a function that starts with process_{name}. In this case it's calling process_quiz_summary function.
-        $paths[] = new restore_path_element('quiz_summary', $this->get_pathfor(''));
-        return $paths;
+        return [
+            new restore_path_element($this->get_namefor(''), $this->get_pathfor('')),
+        ];
     }
 
-    public function process_quiz_summary($data) {
-        global $DB;
-
-        $data['cmid'] = $this->task->get_moduleid();
-        $DB->insert_record('local_quiz_summary_option', $data, false);
+    /**
+     * Store the restored option against the new course module.
+     *
+     * Core dispatches this with the chunk's tags as an ARRAY, not an object.
+     * The write goes through option::set() so that restoring into a course module
+     * that already has a row updates it instead of hitting the unique index on cmid
+     * and aborting the whole restore.
+     *
+     * @param array $data The backed up element, holding show_summary.
+     * @return void
+     */
+    public function process_local_quiz_summary_option($data) {
+        option::set((int) $this->task->get_moduleid(), !empty($data['show_summary']));
     }
 }

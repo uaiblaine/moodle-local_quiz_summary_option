@@ -15,19 +15,29 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Language strings
+ * Language strings.
  *
  * @package    local_quiz_summary_option
- * @author     Christina Roperto (christinatheeroperto@catalyst-au.net)
- * @copyright  Catalyst IT
+ * @copyright  2021 Catalyst IT
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$string['pluginname'] = 'Quiz Summary Option';
-$string['privacy:metadata'] = 'The local quiz summary option plugin does not store any personal data.';
-$string['configsummaryoption'] = 'on show summary page will be appear once the quiz is submitted, otherwise summary page is hidden';
-$string['summarypageoption'] = 'Summary page option';
+defined('MOODLE_INTERNAL') || die();
+
+$string['pluginname'] = 'Quiz summary option';
+$string['privacy:metadata'] = 'The Quiz summary option plugin stores one display setting per quiz and does not store any personal data.';
 $string['summaryoption'] = 'Summary page';
-$string['summaryoption_show'] = 'Show';
-$string['summaryoption_help'] = 'enable the ability to show/hide summary page after completing quiz';
+$string['summaryoption_help'] = 'Choose whether students see the summary of attempt page when they finish a quiz attempt.
+
+**Show** keeps the standard behaviour. The student reaches a page listing every question, where unanswered questions
+are flagged, the attempt can be resumed with *Return to attempt*, and the submission has to be confirmed.
+
+**Hide** submits the attempt as soon as the student selects *Finish attempt ...*. Because the summary page is skipped,
+the submission confirmation, the warning about unanswered questions and the *Return to attempt* button are not shown,
+and the attempt cannot be resumed.
+
+This setting applies to the web interface only. Attempts finished in the Moodle app are not affected.';
 $string['summaryoption_hide'] = 'Hide';
+$string['summaryoption_show'] = 'Show';
+$string['summarypageoption'] = 'Summary page option';
