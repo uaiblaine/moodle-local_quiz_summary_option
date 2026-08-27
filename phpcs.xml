@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<ruleset name="local_quiz_summary_option">
+    <description>PHPCS rules for local_quiz_summary_option.</description>
+
+    <rule ref="moodle" />
+
+    <exclude-pattern>*/node_modules/*</exclude-pattern>
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+</ruleset>

@@ -15,17 +15,19 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version details
+ * Plugin version and other metadata.
  *
- * @package   local_quiz_summary_option
- * @author    Christina Roperto (christinatheeroperto@catalyst-au.net)
- * @copyright Catalyst IT
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package    local_quiz_summary_option
+ * @copyright  2021 Catalyst IT
+ * @copyright  2026 Anderson Blaine
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-defined('MOODLE_INTERNAL') || die;
 
-$plugin->version   = 2026082700;
-$plugin->release   = '0.1';
-$plugin->maturity  = MATURITY_STABLE;
-$plugin->requires  = 2024100700; // Moodle 4.5 release and upwards.
+defined('MOODLE_INTERNAL') || die();
+
 $plugin->component = 'local_quiz_summary_option';
+$plugin->version = 2026082700;
+$plugin->requires = 2025100600;
+$plugin->maturity = MATURITY_STABLE;
+$plugin->release = 'v0.2.0';
+$plugin->supported = [501, 502];

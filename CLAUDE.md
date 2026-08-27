@@ -1,0 +1,140 @@
+# Claude instructions for `local_quiz_summary_option`
+
+This file is auto-loaded as context whenever Claude works in this plugin's
+directory tree. **Fleet-wide standards live in `~/dev/CLAUDE.md`** (coding
+style, CI gates, lang-string rules, the `mdl` environment, git rules) — do not
+repeat them here. This file keeps only what is true for this plugin.
+
+Plugin context: a Moodle **local** plugin ("Quiz summary option") that adds a
+per-quiz *Summary page* setting and, when it is set to Hide, makes
+*Finish attempt ...* submit the attempt immediately instead of routing the
+student through mod_quiz's summary of attempt page. It owns one table,
+`local_quiz_summary_option` (`cmid`, `show_summary`, unique on `cmid`), holds no
+personal data, and depends on mod_quiz's request vocabulary rather than on any
+API mod_quiz publishes. Supports Moodle **5.1 through 5.2**
+(`$plugin->requires = 2025100600`, `$plugin->supported = [501, 502]`). CI is the
+moodle-an-hochschulen reusable workflow, one job per supported branch in
+`.github/workflows/ci.yml` — **update those jobs when `supported` changes**.
+Mounted into m501 and m502 at `local/quiz_summary_option`
+(see `~/dev/moodle-dev/plugins.conf`).
+
+This is a fork of `catalyst/moodle-local_quiz_summary_option`. Inherited files
+keep Catalyst's copyright alongside the fork's; `MOODLE_405_STABLE` and
+`MOODLE_39_STABLE` remain as the older-branch releases and must not be rebased
+onto `main`.
+
+## Commands
+
+```sh
+mdl ci moodle-local_quiz_summary_option           # full CI locally before any push
+mdl ci moodle-local_quiz_summary_option --matrix  # every leg GitHub runs
+mdl phpunit m502 local_quiz_summary_option        # targeted tests
+mdl purge m502                                    # after changing db/hooks.php or db/events.php
+```
+
+Any change to `db/hooks.php`, `db/events.php` or `db/tasks.php` needs a
+`version.php` bump or the registration never takes effect.
+
+## Code layout
+
+```
+lib.php                              Only the two course module form callbacks.
+classes/local/option.php             Storage: is_shown/set/delete/purge_orphans + SHOW/HIDE.
+classes/local/summary_page.php       The request-time decision. Read its comments before editing.
+classes/hook_callbacks.php           \core\hook\after_config entry point.
+classes/observer.php                 course_module_deleted -> option::delete().
+classes/task/cleanup_orphans.php     Daily sweep for rows whose cm has gone.
+classes/event/summary_option_updated.php
+classes/tests/test_form.php          moodleform_mod stub for the form callback tests.
+backup/moodle2/                      Module-level backup and restore of the stored flag.
+```
+
+## Architecture gotchas
+
+**The `nextpage == -1` guard in `summary_page::maybe_skip()` is a safety
+mechanism, not an accident.** `mod/quiz/attempt.php` stamps `nextpage = -1` into
+the attempt form only when `is_last_page()` is true, so it is the plugin's only
+proof that the student is on the last page — nothing else is available that
+early in the request. Replacing it with core's own `$page` computation (which
+would also match `thispage == -1`) looks like a bug fix and is not: the
+navigation block's *Finish attempt ...* link is hijacked by
+`mod/quiz/module.js` into `nav_to_page(-1)` from **any** page, so the wider
+predicate would force `finishattempt` on a student sitting on page 1 of 10.
+`processattempt.php` skips its own out-of-sequence check once `finishattempt` is
+set, so unopened pages would be submitted unanswered with no warning. Core
+deliberately sends that click to the summary page. Leave the guard alone.
+
+**`coursemodule` is the EMPTY STRING on the add path, not null or 0.**
+`prepare_new_moduleinfo_data()` sets `$data->coursemodule = ''`, and the value
+reaches the DML layer untouched (`where_clause()` special-cases only NULL). A
+bigint comparison against `''` makes PostgreSQL throw `dml_read_exception` and
+the quiz settings page dies, while MySQL coerces it to `0` and looks fine. Cast
+before any lookup. `tests/lib_test.php::test_add_form_handles_empty_string_coursemodule`
+is the regression test, and the stub's default is `''` for that reason.
+
+**An absent form property means "not submitted", never "Show".** Core's public
+`update_module()` API builds a `moduleinfo` carrying only `modulename`, `scale`
+and `type`, and it does set `modulename` to `quiz`, so the plugin's early return
+does not save it. Defaulting an absent property silently reset every teacher's
+Hide whenever any tool touched the quiz for another reason.
+
+**Form element names are frankenstyle-prefixed on purpose.** They are injected
+into mod_quiz's own form namespace, and `moodleform_mod::apply_admin_defaults()`
+binds any `quiz` admin setting whose name matches an element — its one attempted
+exclusion has its `strpos()` arguments reversed and never skips anything. The
+value also rides into `quiz_add_instance()` and is discarded only by DML column
+filtering. The element name and the `$moduleinfo` property read in
+`local_quiz_summary_option_coursemodule_edit_post_actions()` must be renamed
+together, or the absent-property guard starts firing for every save.
+
+**The hook path is not a drop-in for the legacy `after_config` callback.**
+`\core\hook\manager` enumerates `db/hooks.php` off disk with
+`core_component::get_plugin_list()` — no installed-plugin filter — and
+`dispatch()` has no try/catch, unlike
+`\core\hook\after_config::process_legacy_callbacks()`. Both protections are
+re-implemented in `hook_callbacks::after_config()`; without them a plugin copied
+onto the web nodes before the upgrade is run would throw out of `config.php` and
+no attempt on the site could be finished. Do not "simplify" either guard away.
+
+**`remove_course_contents()` fires no `course_module_deleted` event.** The
+observer covers deleting a single activity; course deletion, *restore and delete
+the current contents* (`restore_dbops::delete_course_content()`) and course
+import all go through `remove_course_contents()` instead, which just deletes the
+`course_modules` rows. That is why the scheduled task exists, and why an
+observer-only cleanup would leak on the highest-volume deletion path on a site.
+
+**Two known limitations, both deliberate and both documented in the help string
+and README.** The option is browser-only: `mod_quiz_process_attempt` finishes
+attempts for the Moodle app without loading `processattempt.php`, and mod_quiz
+ships no `db/mobile.php` for a local plugin to hook. And an attempt that goes
+overdue is redirected to the summary page by `processattempt.php` itself
+whatever the setting says.
+
+**Deliberately not implemented, with the reasoning:** there is no site-level
+default and no capability. If a site default is ever added it must be applied in
+*both* `option::is_shown()` and the form default in the same commit, or the
+settings page will lie — the runtime path returns on a missing row before any
+default is consulted. A capability gating who may remove the submission
+safeguard is worth considering, since today it is whoever holds
+`moodle/course:manageactivities`.
+
+## Testing notes
+
+- The storage layer logs an event against the module context, so tests need a
+  **real** course module. `option::set()` on a fabricated cmid silently skips
+  the event (`IGNORE_MISSING`), which would hide a mistake — create a quiz.
+- `resetAfterTest()` does not restore `$_GET`, `$_POST` or `$SCRIPT`.
+  `summary_page_test` and `hook_callbacks_test` save and restore them in
+  `setUp`/`tearDown`; without that, tests pass or fail depending on order.
+- Every negative assertion in this suite carries a **control** — the same
+  arrangement with one field flipped, asserted to fire. The suite this replaced
+  had two tests that returned at the second guard and asserted nothing.
+- `tests/backup_restore_test.php` copies core's `backup_and_restore()` helper
+  shape: `MODE_IMPORT` on the backup side leaves the result unzipped so the
+  restore controller can read it back directly.
+
+## When in doubt
+
+Follow the patterns in existing files. The codebase is internally
+consistent — if a new file feels like it matches no existing shape,
+re-examine the approach.
