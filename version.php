@@ -24,8 +24,8 @@
  */
 defined('MOODLE_INTERNAL') || die;
 
-$plugin->version   = 2021060908;
+$plugin->version   = 2026010700;
 $plugin->release   = '0.1';
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->requires  = 2020061500; // Moodle 3.9 release and upwards.
+$plugin->requires  = 2024100700; // Moodle 4.5 release and upwards.
 $plugin->component = 'local_quiz_summary_option';
