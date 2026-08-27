@@ -16,6 +16,9 @@
 
 namespace local_quiz_summary_option\local;
 
+use context_module;
+use local_quiz_summary_option\event\summary_option_updated;
+
 /**
  * Storage and lookup for the per-quiz summary page option.
  *
@@ -58,14 +61,15 @@ class option {
     /**
      * Store the option for a course module, inserting or updating as needed.
      *
-     * Writing the same value again is a no-op, so callers may call this
-     * unconditionally.
+     * Writing the same value again is a no-op and fires no event, so callers may
+     * call this unconditionally.
      *
      * @param int $cmid Course module id.
      * @param bool $show True to show the summary page, false to skip it.
+     * @param bool $triggerevent Whether to log the change. Restore passes false.
      * @return void
      */
-    public static function set(int $cmid, bool $show): void {
+    public static function set(int $cmid, bool $show, bool $triggerevent = true): void {
         global $DB;
 
         if ($cmid <= 0) {
@@ -84,10 +88,14 @@ class option {
                 return;
             }
             $DB->update_record(self::TABLE, ['id' => $existing->id, 'show_summary' => $value]);
-            return;
+            $id = (int) $existing->id;
+        } else {
+            $id = (int) $DB->insert_record(self::TABLE, ['cmid' => $cmid, 'show_summary' => $value]);
         }
 
-        $DB->insert_record(self::TABLE, ['cmid' => $cmid, 'show_summary' => $value], false);
+        if ($triggerevent) {
+            self::trigger_updated_event($cmid, $id, $value);
+        }
     }
 
     /**
@@ -100,5 +108,59 @@ class option {
         global $DB;
 
         $DB->delete_records(self::TABLE, ['cmid' => $cmid]);
+    }
+
+    /**
+     * Delete every row whose course module no longer exists.
+     *
+     * The observer on course_module_deleted covers a single activity being removed,
+     * but remove_course_contents() never fires that event, so course deletion,
+     * "restore and delete the current contents" and course import all leak rows.
+     * This sweep is the backstop that covers every deletion path.
+     *
+     * @param int $batchsize How many rows to delete per statement.
+     * @return int Number of rows removed.
+     */
+    public static function purge_orphans(int $batchsize = 500): int {
+        global $DB;
+
+        /* Deleted in batches through an explicit id list rather than one correlated
+           DELETE: MySQL and MariaDB refuse a subquery that names the table being
+           deleted from, so the single-statement form is not portable. */
+        $sql = "SELECT o.id
+                  FROM {" . self::TABLE . "} o
+             LEFT JOIN {course_modules} cm ON cm.id = o.cmid
+                 WHERE cm.id IS NULL";
+
+        $removed = 0;
+        while ($rows = $DB->get_records_sql($sql, null, 0, $batchsize)) {
+            $DB->delete_records_list(self::TABLE, 'id', array_keys($rows));
+            $removed += count($rows);
+        }
+
+        return $removed;
+    }
+
+    /**
+     * Log a change to the stored option.
+     *
+     * @param int $cmid Course module id.
+     * @param int $id Id of the row that was written.
+     * @param int $value The stored show_summary value.
+     * @return void
+     */
+    protected static function trigger_updated_event(int $cmid, int $id, int $value): void {
+        $context = context_module::instance($cmid, IGNORE_MISSING);
+        if (!$context) {
+            // No module context yet (or already gone) — nothing to attach the event to.
+            return;
+        }
+
+        $event = summary_option_updated::create([
+            'context' => $context,
+            'objectid' => $id,
+            'other' => ['showsummary' => $value],
+        ]);
+        $event->trigger();
     }
 }

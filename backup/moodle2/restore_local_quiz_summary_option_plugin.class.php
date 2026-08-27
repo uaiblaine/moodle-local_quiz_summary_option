@@ -51,12 +51,13 @@ class restore_local_quiz_summary_option_plugin extends restore_local_plugin {
      * Core dispatches this with the chunk's tags as an ARRAY, not an object.
      * The write goes through option::set() so that restoring into a course module
      * that already has a row updates it instead of hitting the unique index on cmid
-     * and aborting the whole restore.
+     * and aborting the whole restore. No event is logged: the change belongs to the
+     * restore, not to a person acting on the quiz.
      *
      * @param array $data The backed up element, holding show_summary.
      * @return void
      */
     public function process_local_quiz_summary_option($data) {
-        option::set((int) $this->task->get_moduleid(), !empty($data['show_summary']));
+        option::set((int) $this->task->get_moduleid(), !empty($data['show_summary']), false);
     }
 }

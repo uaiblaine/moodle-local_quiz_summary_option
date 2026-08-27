@@ -16,33 +16,52 @@
 
 namespace local_quiz_summary_option;
 
+use local_quiz_summary_option\local\summary_page;
+
 /**
- * Hook callbacks for local_quiz_summary_option.
+ * Hook callbacks.
  *
- * @package   local_quiz_summary_option
- * @author    2026 Tomo Tsuyuki <tomotsuyuki@catalyst-au.net>
- * @copyright 2026 Catalyst IT
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package    local_quiz_summary_option
+ * @copyright  2026 Catalyst IT
+ * @copyright  2026 Anderson Blaine
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class hook_callbacks {
     /**
-     * Runs after config has been set.
+     * Runs as soon as core has finished setting up its configuration.
      *
-     * @param \core\hook\after_config $hook
-     * @return void|null
+     * @param \core\hook\after_config $hook The hook instance, unused.
+     * @return void
      */
-    public static function after_config(\core\hook\after_config $hook) {
+    public static function after_config(\core\hook\after_config $hook): void {
         global $CFG;
 
         if (during_initial_install() || isset($CFG->upgraderunning)) {
             return;
         }
 
-        // Handles edge case during upgrade & install where this callback doesn't have the lib loaded.
-        if (!function_exists('local_quiz_summary_option_after_config')) {
-            require_once($CFG->dirroot . '/local/quiz_summary_option/lib.php');
+        /* The hook manager registers db/hooks.php callbacks for every plugin present
+           on disk (\core\hook\manager::get_hook_callbacks() lists them with
+           core_component::get_plugin_list()), whereas the legacy callback path this
+           replaces skipped plugins that were not installed yet. Without this check a
+           plugin copied onto the web nodes before the upgrade is run would query a
+           table that does not exist, on every last-page quiz submission. */
+        if (!get_config('local_quiz_summary_option', 'version')) {
+            return;
         }
 
-        local_quiz_summary_option_after_config();
+        /* \core\hook\manager::dispatch() calls callbacks without a try/catch, unlike
+           \core\hook\after_config::process_legacy_callbacks(). An exception escaping
+           here would abort the request inside config.php, losing the student's
+           answers, so contain it the way the legacy path did. */
+        try {
+            summary_page::maybe_skip();
+        } catch (\Throwable $e) {
+            debugging(
+                'local_quiz_summary_option after_config failed: ' . $e->getMessage(),
+                DEBUG_DEVELOPER,
+                $e->getTrace()
+            );
+        }
     }
 }

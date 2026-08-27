@@ -25,6 +25,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+$string['event_summary_option_updated'] = 'Quiz summary page option updated';
 $string['pluginname'] = 'Quiz summary option';
 $string['privacy:metadata'] = 'The Quiz summary option plugin stores one display setting per quiz and does not store any personal data.';
 $string['summaryoption'] = 'Summary page';
@@ -41,3 +42,4 @@ This setting applies to the web interface only. Attempts finished in the Moodle 
 $string['summaryoption_hide'] = 'Hide';
 $string['summaryoption_show'] = 'Show';
 $string['summarypageoption'] = 'Summary page option';
+$string['task_cleanup_orphans'] = 'Remove summary page options for deleted quizzes';

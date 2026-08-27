@@ -15,17 +15,18 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version details
+ * Event observer registrations.
  *
- * @package   local_quiz_summary_option
- * @author    Christina Roperto (christinatheeroperto@catalyst-au.net)
- * @copyright Catalyst IT
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package    local_quiz_summary_option
+ * @copyright  2026 Anderson Blaine
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-defined('MOODLE_INTERNAL') || die;
 
-$plugin->version   = 2026082700;
-$plugin->release   = '0.1';
-$plugin->maturity  = MATURITY_STABLE;
-$plugin->requires  = 2024100700; // Moodle 4.5 release and upwards.
-$plugin->component = 'local_quiz_summary_option';
+defined('MOODLE_INTERNAL') || die();
+
+$observers = [
+    [
+        'eventname' => '\core\event\course_module_deleted',
+        'callback' => '\local_quiz_summary_option\observer::course_module_deleted',
+    ],
+];

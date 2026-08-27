@@ -14,21 +14,35 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+namespace local_quiz_summary_option\task;
+
+use local_quiz_summary_option\local\option;
+
 /**
- * Hook callback registrations.
+ * Removes stored options whose quiz no longer exists.
  *
  * @package    local_quiz_summary_option
- * @copyright  2026 Catalyst IT
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+class cleanup_orphans extends \core\task\scheduled_task {
+    /**
+     * Localised task name shown in the scheduled tasks report.
+     *
+     * @return string
+     */
+    public function get_name(): string {
+        return get_string('task_cleanup_orphans', 'local_quiz_summary_option');
+    }
 
-defined('MOODLE_INTERNAL') || die();
+    /**
+     * Delete every row whose course module has gone.
+     *
+     * @return void
+     */
+    public function execute(): void {
+        $removed = option::purge_orphans();
 
-$callbacks = [
-    [
-        'hook' => \core\hook\after_config::class,
-        'callback' => '\local_quiz_summary_option\hook_callbacks::after_config',
-        'priority' => 0,
-    ],
-];
+        mtrace("local_quiz_summary_option: removed $removed orphaned row(s).");
+    }
+}

@@ -16,6 +16,7 @@
 
 namespace local_quiz_summary_option\local;
 
+use local_quiz_summary_option\event\summary_option_updated;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
@@ -76,6 +77,51 @@ final class option_test extends \advanced_testcase {
         $this->assertSame(1, (int) $DB->get_field(option::TABLE, 'show_summary', ['cmid' => $cmid]));
     }
 
+    /**
+     * A change is logged, and writing the same value again is not.
+     *
+     * @return void
+     */
+    public function test_set_logs_only_real_changes(): void {
+        $this->resetAfterTest();
+        $cmid = $this->create_quiz_cmid();
+
+        $sink = $this->redirectEvents();
+        option::set($cmid, false);
+        $events = $sink->get_events();
+        $sink->close();
+
+        $this->assertCount(1, $events);
+        $this->assertInstanceOf(summary_option_updated::class, $events[0]);
+        $this->assertSame(0, (int) $events[0]->other['showsummary']);
+        $this->assertSame(\context_module::instance($cmid)->id, (int) $events[0]->contextid);
+
+        $sink = $this->redirectEvents();
+        option::set($cmid, false);
+        $this->assertCount(0, $sink->get_events(), 'Re-writing the same value must not log a change.');
+
+        // Control: a genuine change through the same sink still logs.
+        option::set($cmid, true);
+        $this->assertCount(1, $sink->get_events());
+        $sink->close();
+    }
+
+    /**
+     * Restore writes without logging, because the change belongs to the restore.
+     *
+     * @return void
+     */
+    public function test_set_can_suppress_the_event(): void {
+        $this->resetAfterTest();
+        $cmid = $this->create_quiz_cmid();
+
+        $sink = $this->redirectEvents();
+        option::set($cmid, false, false);
+        $this->assertCount(0, $sink->get_events());
+        $sink->close();
+
+        $this->assertFalse(option::is_shown($cmid), 'The value must still have been written.');
+    }
 
     /**
      * Deleting removes only the row asked for.
@@ -93,5 +139,50 @@ final class option_test extends \advanced_testcase {
 
         $this->assertTrue(option::is_shown($first));
         $this->assertFalse(option::is_shown($second));
+    }
+
+    /**
+     * The sweep removes rows whose course module has gone and keeps the rest.
+     *
+     * @return void
+     */
+    public function test_purge_orphans_removes_only_orphans(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $live = $this->create_quiz_cmid();
+        option::set($live, false);
+
+        // Two rows pointing at course modules that do not exist.
+        $orphans = [];
+        foreach ([$this->create_quiz_cmid(), $this->create_quiz_cmid()] as $cmid) {
+            option::set($cmid, false);
+            $DB->delete_records('course_modules', ['id' => $cmid]);
+            $orphans[] = $cmid;
+        }
+
+        $this->assertSame(2, option::purge_orphans());
+
+        foreach ($orphans as $cmid) {
+            $this->assertFalse($DB->record_exists(option::TABLE, ['cmid' => $cmid]));
+        }
+        $this->assertTrue($DB->record_exists(option::TABLE, ['cmid' => $live]));
+        $this->assertSame(0, option::purge_orphans(), 'A second sweep must find nothing.');
+    }
+
+    /**
+     * The sweep keeps going past its batch size.
+     *
+     * @return void
+     */
+    public function test_purge_orphans_handles_more_rows_than_one_batch(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        for ($i = 1; $i <= 5; $i++) {
+            $DB->insert_record(option::TABLE, ['cmid' => 9000000 + $i, 'show_summary' => 0]);
+        }
+
+        $this->assertSame(5, option::purge_orphans(2));
+        $this->assertSame(0, $DB->count_records(option::TABLE));
     }
 }

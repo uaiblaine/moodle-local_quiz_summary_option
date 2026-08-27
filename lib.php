@@ -17,10 +17,12 @@
 /**
  * Callbacks core looks for in a plugin's lib.php.
  *
- * The two course-module form callbacks have no Hooks API replacement on any
- * supported branch — course/moodleform_mod.php and course/modlib.php still
- * dispatch them through get_plugins_with_function() without the
- * migrated-to-hook flag — so lib.php remains their correct home.
+ * Only the two course-module form callbacks live here. They have no Hooks API
+ * replacement on any supported branch — course/moodleform_mod.php and
+ * course/modlib.php still dispatch them through get_plugins_with_function()
+ * without the migrated-to-hook flag — so lib.php remains their correct home.
+ * The attempt-processing behaviour, which does have a hook, lives in
+ * classes/hook_callbacks.php instead.
  *
  * @package    local_quiz_summary_option
  * @copyright  2021 Catalyst IT
@@ -98,32 +100,4 @@ function local_quiz_summary_option_coursemodule_edit_post_actions($moduleinfo, $
     );
 
     return $moduleinfo;
-}
-
-/**
- * Skips the summary of attempt page when the option is set to hide it.
- *
- * @return void
- */
-function local_quiz_summary_option_after_config() {
-    global $SCRIPT;
-
-    if (!isset($SCRIPT) || $SCRIPT !== '/mod/quiz/processattempt.php') {
-        return;
-    }
-
-    if (optional_param('nextpage', 0, PARAM_INT) !== -1) {
-        return;
-    }
-
-    $next = optional_param('next', null, PARAM_TEXT);
-    if ($next === null && optional_param('thispage', 0, PARAM_INT) !== -1) {
-        return;
-    }
-
-    if (option::is_shown(optional_param('cmid', 0, PARAM_INT))) {
-        return;
-    }
-
-    $_GET['finishattempt'] = 1;
 }
