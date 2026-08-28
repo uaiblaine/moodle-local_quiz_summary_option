@@ -22,10 +22,12 @@ that go with it, and this is worth knowing before turning the option on:
 - the **warning about unanswered questions**,
 - the **Return to attempt** button.
 
-With **Hide**, one click on *Finish attempt ...* submits and grades the attempt
-with none of those. On a graded, single-attempt quiz that is not recoverable.
-Anyone who can edit the activity can set this, so treat it as a decision about
-assessment design rather than a cosmetic tweak.
+With **Hide**, one click on *Finish attempt ...* on the last page submits and
+grades the attempt with none of those. A submitted attempt cannot be reopened by
+anyone, so how much an accidental click costs is decided by *Attempts allowed*:
+with the quiz default of unlimited attempts the student simply starts again,
+while on a single-attempt quiz the only remedy is a teacher deleting the attempt.
+Treat it as a decision about assessment design rather than a cosmetic tweak.
 
 Two behaviours are deliberately left to core:
 
@@ -34,7 +36,16 @@ Two behaviours are deliberately left to core:
   before submitting" path, and honouring the option there would submit pages the
   student never opened, with no warning.
 - **An attempt that goes overdue** is redirected to the summary page by
-  mod_quiz itself, whatever this setting says.
+  mod_quiz itself, whatever this setting says. Note that Hide changes *when* that
+  happens rather than only where it leads: mod_quiz decides an attempt is overdue
+  inside the branch it takes only when the attempt is not being finished, so under
+  Hide a last-page click after the close time submits and grades instead of
+  reaching the grace-period screen. The timer auto-submit still behaves normally,
+  because this plugin does not rewrite that request.
+
+Because the setting is stored per quiz and nowhere else, the *Summary page
+option* section opens by itself whenever a quiz has it set to Hide — a quiz that
+skips the summary page should not look identical to one that does not.
 
 Limitations
 -----------

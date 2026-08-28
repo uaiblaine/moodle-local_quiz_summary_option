@@ -24,9 +24,12 @@ require_once($CFG->dirroot . '/course/moodleform_mod.php');
 /**
  * Minimal moodleform_mod stand-in for the course module form callback tests.
  *
- * The real form cannot be constructed without a course, a module and a section, and
- * the callback under test reads nothing but get_current(), so the parent constructor
- * is deliberately skipped.
+ * The real form cannot be constructed without a course, a module and a section, and the
+ * callback under test reads nothing but get_current(), so the parent constructor is
+ * deliberately skipped. Everything else is inherited: $current is moodleform_mod's own
+ * protected property and get_current() is its own getter, so a callback that writes a
+ * property onto the current data is exercised against the real contract rather than
+ * against a stub that hands out a fresh object each call.
  *
  * @package    local_quiz_summary_option
  * @category   test
@@ -35,21 +38,18 @@ require_once($CFG->dirroot . '/course/moodleform_mod.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class test_form extends \moodleform_mod {
-    /** @var string Module name reported by get_current(). */
-    private $modulename;
-
-    /** @var mixed Course module id reported by get_current(). Core uses '' on the add path. */
-    private $coursemodule;
-
     /**
      * Build the stub without invoking moodleform_mod's constructor.
      *
      * @param string $modulename Module name to report.
-     * @param mixed $coursemodule Course module id to report. Pass '' for the add path.
+     * @param mixed $coursemodule Course module id to report. Pass '' for the add path,
+     *                            which is what prepare_new_moduleinfo_data() supplies.
      */
     public function __construct($modulename = 'quiz', $coursemodule = '') {
-        $this->modulename = $modulename;
-        $this->coursemodule = $coursemodule;
+        $this->current = (object) [
+            'modulename' => $modulename,
+            'coursemodule' => $coursemodule,
+        ];
     }
 
     /**
@@ -58,17 +58,5 @@ class test_form extends \moodleform_mod {
      * @return void
      */
     protected function definition() {
-    }
-
-    /**
-     * The current module data the callback reads.
-     *
-     * @return \stdClass
-     */
-    public function get_current() {
-        return (object) [
-            'modulename' => $this->modulename,
-            'coursemodule' => $this->coursemodule,
-        ];
     }
 }

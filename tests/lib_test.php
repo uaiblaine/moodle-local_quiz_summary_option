@@ -146,6 +146,71 @@ final class lib_test extends \advanced_testcase {
     }
 
     /**
+     * The plugin's section opens by itself when the summary page is hidden.
+     *
+     * formslib collapses every header after the first that holds no required or errored
+     * element, so without this a stored Hide is invisible until the teacher expands the
+     * section — the setting and its absence look identical.
+     *
+     * @return void
+     */
+    public function test_the_section_expands_only_when_the_summary_is_hidden(): void {
+        $this->resetAfterTest();
+        $cmid = $this->create_quiz_cmid();
+
+        // Control: at the default the section is left to formslib, which collapses it.
+        $mform = new \MoodleQuickForm('test', 'POST', 'test');
+        local_quiz_summary_option_coursemodule_standard_elements(new test_form('quiz', $cmid), $mform);
+        $this->assertArrayNotHasKey('local_quiz_summary_optionhdr', $mform->_collapsibleElements);
+
+        option::set($cmid, false);
+        $mform = new \MoodleQuickForm('test', 'POST', 'test');
+        local_quiz_summary_option_coursemodule_standard_elements(new test_form('quiz', $cmid), $mform);
+        // Formslib records the state as "is collapsed", so expanded reads as false.
+        $this->assertFalse($mform->_collapsibleElements['local_quiz_summary_optionhdr']);
+    }
+
+    /**
+     * The stored value is published on the form's current data, on the edit path only.
+     *
+     * Core's apply_admin_locked_flags() reads $this->current->$name to decide whether a
+     * locked element may be frozen, and treats a missing property as "matches the site
+     * value". Without this the field would freeze to the site value and the next save
+     * would silently overwrite the teacher's choice. On the add path the property must
+     * stay absent, or it would override the site default apply_admin_defaults() sets.
+     *
+     * @return void
+     */
+    public function test_the_stored_value_is_published_on_the_current_data(): void {
+        $this->resetAfterTest();
+        $cmid = $this->create_quiz_cmid();
+        option::set($cmid, false);
+
+        $formwrapper = new test_form('quiz', $cmid);
+        local_quiz_summary_option_coursemodule_standard_elements(
+            $formwrapper,
+            new \MoodleQuickForm('test', 'POST', 'test')
+        );
+        $this->assertSame(option::HIDE, $formwrapper->get_current()->local_quiz_summary_option);
+
+        option::set($cmid, true);
+        $formwrapper = new test_form('quiz', $cmid);
+        local_quiz_summary_option_coursemodule_standard_elements(
+            $formwrapper,
+            new \MoodleQuickForm('test', 'POST', 'test')
+        );
+        $this->assertSame(option::SHOW, $formwrapper->get_current()->local_quiz_summary_option);
+
+        // The add path must leave it absent.
+        $addform = new test_form('quiz', '');
+        local_quiz_summary_option_coursemodule_standard_elements(
+            $addform,
+            new \MoodleQuickForm('test', 'POST', 'test')
+        );
+        $this->assertObjectNotHasProperty('local_quiz_summary_option', $addform->get_current());
+    }
+
+    /**
      * Saving the form stores both possible values, including the one the plugin exists for.
      *
      * @return void

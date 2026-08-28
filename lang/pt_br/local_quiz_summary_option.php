@@ -35,11 +35,14 @@ $string['summaryoption_help'] = 'Escolha se os estudantes verao a pagina de resu
 questoes sem resposta sao sinalizadas, a tentativa pode ser retomada com *Retornar a tentativa* e o envio precisa ser
 confirmado.
 
-**Ocultar** envia a tentativa assim que o estudante seleciona *Finalizar tentativa ...*. Como a pagina de resumo e
-ignorada, a confirmacao de envio, o aviso sobre questoes sem resposta e o botao *Retornar a tentativa* nao sao
-exibidos, e a tentativa nao pode ser retomada.
+**Ocultar** envia a tentativa assim que o estudante seleciona *Finalizar tentativa ...* na ultima pagina. Como a
+pagina de resumo e ignorada, a confirmacao de envio, o aviso sobre questoes sem resposta e o botao *Retornar a
+tentativa* nao sao exibidos. Uma tentativa enviada nao pode ser reaberta, entao em um questionario que permite uma
+unica tentativa um clique acidental so pode ser desfeito por um professor excluindo a tentativa.
 
-Esta configuracao vale apenas para a interface web. Tentativas finalizadas no aplicativo Moodle nao sao afetadas.';
+Selecionar *Finalizar tentativa ...* no bloco de navegacao a partir de uma pagina anterior ainda abre a pagina de
+resumo, e esta configuracao vale apenas para a interface web. Tentativas finalizadas no aplicativo Moodle nao sao
+afetadas.';
 $string['summaryoption_hide'] = 'Ocultar';
 $string['summaryoption_show'] = 'Mostrar';
 $string['summarypageoption'] = 'Opcao da pagina de resumo';

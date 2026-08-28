@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_quiz_summary_option';
-$plugin->version = 2026082700;
+$plugin->version = 2026082701;
 $plugin->requires = 2025100600;
 $plugin->maturity = MATURITY_STABLE;
 $plugin->release = 'v0.2.0';

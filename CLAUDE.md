@@ -103,6 +103,28 @@ import all go through `remove_course_contents()` instead, which just deletes the
 `course_modules` rows. That is why the scheduled task exists, and why an
 observer-only cleanup would leak on the highest-volume deletion path on a site.
 
+**The form section must open itself when Hide is stored, and the stored value must
+be published on `$current`.** Two separate core contracts, both invisible until
+broken. formslib collapses every header after the first that holds no required or
+errored element (`lib/formslib.php` — the branch is guarded by
+`!isset($this->_collapsibleElements[$headername])`, which is why an explicit
+`setExpanded()` from the plugin wins), so without it a quiz with Hide looks
+identical to one without it. And `moodleform_mod::apply_admin_locked_flags()`
+decides whether to freeze a locked element by comparing the site value against
+`$this->current->$name`, treating an **absent** property as "matches" — so a site
+that locked `quiz/local_quiz_summary_option` through mod_quiz's admin defaults
+would freeze the field to the site value and the next save would silently
+overwrite the teacher's choice. Publish it on the edit path only: on the add path
+the property would override the site default `apply_admin_defaults()` is entitled
+to set. Both are mutation-covered in `tests/lib_test.php`.
+
+**`classes/tests/test_form.php` inherits `$current` and `get_current()` from
+`moodleform_mod` on purpose.** `moodleform_mod` declares `protected $current` and
+its own getter, so redeclaring the property as `private` is a PHP fatal, and
+overriding `get_current()` to build a fresh object each call would make the stub
+disagree with the real contract — a callback that writes onto the current data
+could not be tested at all.
+
 **Two known limitations, both deliberate and both documented in the help string
 and README.** The option is browser-only: `mod_quiz_process_attempt` finishes
 attempts for the Moodle app without loading `processattempt.php`, and mod_quiz
@@ -110,13 +132,42 @@ ships no `db/mobile.php` for a local plugin to hook. And an attempt that goes
 overdue is redirected to the summary page by `processattempt.php` itself
 whatever the setting says.
 
-**Deliberately not implemented, with the reasoning:** there is no site-level
-default and no capability. If a site default is ever added it must be applied in
-*both* `option::is_shown()` and the form default in the same commit, or the
-settings page will lie — the runtime path returns on a missing row before any
-default is consulted. A capability gating who may remove the submission
-safeguard is worth considering, since today it is whoever holds
-`moodle/course:manageactivities`.
+**Deliberately not implemented, with the reasoning — do not revisit these
+without a new fact.**
+
+*No capability, settled by evidence.* `grep -n capability mod/quiz/mod_form.php`
+returns nothing: core gates strictly more student-impacting quiz settings with
+none — `navmethod = sequential` bars returning to any earlier page, `attempts = 1`
+makes every attempt final, `browsersecurity` locks the browser down. All of
+mod_quiz's own capabilities answer "who may *do* this", never "which value may
+this setting take"; `mod/quiz:manage` is the single undivided right to edit quiz
+settings. A new capability would be `CAP_ALLOW` for editingteacher and manager by
+default, so it would change nothing on any default site. Revisit only if the
+plugin ever gains a setting that changes what a *student may do* in an attempt —
+that is the boundary mod_quiz's capabilities actually draw.
+
+*No site-level default.* Nobody has asked in five years across three branches, and
+the only safe form is an add-form default that does not touch existing quizzes,
+which is not what an admin would expect. The inherited `configsummaryoption` lang
+string was the description half of a `settings.php` upstream never wrote; it was
+deleted rather than resurrected, and the current core convention is `<name>_desc`
+anyway. If one is ever added it must be applied in *both* `option::is_shown()` and
+the form default in the same commit, or the settings page will lie — the runtime
+path returns on a missing row before any default is consulted.
+
+*No confirmation dialogue yet.* Recovering the submission confirmation without the
+summary page is feasible and is the one genuine feature left: bind a plugin-owned
+AMD module to the attempt page's finish button through
+`\core\hook\output\before_footer_html_generation`. Three things decide the
+design. It must be a **third value of the select**, never a change to existing
+Hide rows, or an upgrade would alter behaviour on live exams. The re-submit must
+use `button.click()`, never `form.submit()` — the latter drops the submitter's
+`next` field, `summary_page::maybe_skip()` then falls through, and the student is
+silently routed to the summary page while the dialogue makes everything look
+right. And it needs a re-entrancy flag, or the re-click loops. Core's own
+`mod_quiz/submission_confirmation` cannot be reused: it is bound to the summary
+page's `.btn-finishattempt button` / `form#frm-finishattempt`. The cost is the
+plugin's first AMD source, tracked `amd/build`, grunt, eslint and Behat.
 
 ## Testing notes
 

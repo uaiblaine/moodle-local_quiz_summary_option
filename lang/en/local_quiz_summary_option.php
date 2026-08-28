@@ -34,11 +34,13 @@ $string['summaryoption_help'] = 'Choose whether students see the summary of atte
 **Show** keeps the standard behaviour. The student reaches a page listing every question, where unanswered questions
 are flagged, the attempt can be resumed with *Return to attempt*, and the submission has to be confirmed.
 
-**Hide** submits the attempt as soon as the student selects *Finish attempt ...*. Because the summary page is skipped,
-the submission confirmation, the warning about unanswered questions and the *Return to attempt* button are not shown,
-and the attempt cannot be resumed.
+**Hide** submits the attempt as soon as the student selects *Finish attempt ...* on the last page. Because the
+summary page is skipped, the submission confirmation, the warning about unanswered questions and the *Return to
+attempt* button are not shown. A submitted attempt cannot be reopened, so on a quiz that allows a single attempt
+an accidental click can only be undone by a teacher deleting the attempt.
 
-This setting applies to the web interface only. Attempts finished in the Moodle app are not affected.';
+Selecting *Finish attempt ...* in the navigation block from an earlier page still opens the summary page, and this
+setting applies to the web interface only. Attempts finished in the Moodle app are not affected.';
 $string['summaryoption_hide'] = 'Hide';
 $string['summaryoption_show'] = 'Show';
 $string['summarypageoption'] = 'Summary page option';

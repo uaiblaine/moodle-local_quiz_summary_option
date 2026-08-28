@@ -52,6 +52,7 @@ function local_quiz_summary_option_coursemodule_standard_elements(moodleform_mod
        "Add an activity -> Quiz" working, and it fails on only half the CI matrix
        if it is removed. */
     $cmid = (int) ($current->coursemodule ?? 0);
+    $shown = option::is_shown($cmid);
 
     $mform->addElement(
         'header',
@@ -67,8 +68,30 @@ function local_quiz_summary_option_coursemodule_standard_elements(moodleform_mod
             option::HIDE => get_string('summaryoption_hide', 'local_quiz_summary_option'),
         ]
     );
-    $mform->setDefault('local_quiz_summary_option', option::is_shown($cmid) ? option::SHOW : option::HIDE);
+    $mform->setDefault('local_quiz_summary_option', $shown ? option::SHOW : option::HIDE);
     $mform->addHelpButton('local_quiz_summary_option', 'summaryoption', 'local_quiz_summary_option');
+
+    if ($cmid <= 0) {
+        return;
+    }
+
+    /* Publish the stored value on the form's current data. Core's
+       apply_admin_locked_flags() decides whether to freeze an element by comparing the
+       site value against $this->current->$name, and treats a property that is not there
+       as "equal", so a site that locked quiz/local_quiz_summary_option would freeze this
+       field to the site value and the next save would silently overwrite whatever the
+       teacher had chosen. Only on the edit path: on the add path the property would
+       override the site default that apply_admin_defaults() is entitled to set. */
+    $current->local_quiz_summary_option = $shown ? option::SHOW : option::HIDE;
+
+    if (!$shown) {
+        /* formslib collapses every header after the first that holds no required or
+           errored element, so a quiz with the summary page hidden looks exactly like one
+           without it until the teacher expands this section. A section carrying a
+           non-default value has to open. The user's own collapse state still wins, which
+           is why $ignoreuserstate is left alone. */
+        $mform->setExpanded('local_quiz_summary_optionhdr', true);
+    }
 }
 
 /**

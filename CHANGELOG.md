@@ -30,6 +30,10 @@ First release of the fork under `github.com/uaiblaine`, targeting Moodle 5.1 and
 
 ### Added
 
+- The plugin's own form section now opens by itself when a quiz has the summary
+  page hidden. formslib collapses every header after the first that holds no
+  required or errored element, so until now a quiz with Hide stored looked
+  exactly like one without it until the teacher expanded the section.
 - Observer on `\core\event\course_module_deleted` removing the stored option
   with its quiz.
 - Daily scheduled task sweeping rows whose course module no longer exists. This
@@ -64,7 +68,20 @@ First release of the fork under `github.com/uaiblaine`, targeting Moodle 5.1 and
   every type; restore names its path element with `get_namefor()`.
 - The help string and the README now state what **Hide** removes (the submission
   confirmation, the unanswered-question warning and *Return to attempt*) and
-  that the option does not apply in the Moodle app.
+  that the option does not apply in the Moodle app. They also say that Hide acts
+  on the last page only, that how much an accidental click costs is decided by
+  *Attempts allowed* because a submitted attempt cannot be reopened, and that
+  under Hide a late last-page click submits instead of reaching the grace-period
+  screen — mod_quiz only transitions an attempt to overdue on the branch it takes
+  when the attempt is not being finished.
+- The stored value is published on the form's current data, so core's
+  `apply_admin_locked_flags()` compares against the real current value. Without
+  it a site that locked the setting through mod_quiz's admin defaults would
+  freeze the field to the site value and silently overwrite the teacher's choice
+  on the next save. No capability is added: mod_quiz gates strictly more
+  student-impacting settings — sequential navigation, a single attempt allowed —
+  with none, and all of its own capabilities answer "who may do this" rather than
+  "which value may this setting take".
 - CI moved from the Catalyst reusable workflow to the moodle-an-hochschulen one,
   with a job per supported branch. The previous workflow gated every job behind
   a `pre_job` eligibility check that no branch of this fork satisfies on push,
